@@ -1,6 +1,4 @@
 extern crate shared;
-use std::ops::Index;
-
 use shared::io::Reader;
 
 fn main() {
@@ -23,9 +21,9 @@ fn part_1(reader: &mut Reader) -> String {
     loop {
         let chars: Vec<char> = line.chars().collect();
         for i in 0..width {
-            let c = chars.index(i * 4 + 1);
+            let c = chars[i * 4 + 1];
             if c.is_ascii_alphabetic() {
-                stacks[i].push(*c);
+                stacks[i].push(c);
             }
         }
 
@@ -70,9 +68,9 @@ fn part_2(reader: &mut Reader) -> String {
     loop {
         let chars: Vec<char> = line.chars().collect();
         for i in 0..width {
-            let c = chars.index(i * 4 + 1);
+            let c = chars[i * 4 + 1];
             if c.is_ascii_alphabetic() {
-                stacks[i].push(*c);
+                stacks[i].push(c);
             }
         }
 
