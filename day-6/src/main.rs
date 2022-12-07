@@ -1,5 +1,5 @@
 extern crate shared;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use shared::io::Reader;
 
@@ -17,11 +17,15 @@ fn part_1(reader: &mut Reader) -> u32 {
     let mut buffer = String::new();
     let input = reader.read_line(&mut buffer);
 
+    let mut dict: HashMap<char, usize> = HashMap::new();
+
     input
         .chars()
         .collect::<Vec<char>>()
         .windows(4)
-        .position(|slice| slice.iter().collect::<HashSet<&char>>().len() == 4)
+        .position(|slice| {
+            slice.iter().collect::<HashSet<&char>>().len() == 4)}
+            
         .expect("expect match") as u32
         + 4
 }
