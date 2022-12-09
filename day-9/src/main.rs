@@ -80,7 +80,7 @@ fn part_2(reader: &mut Reader) -> usize {
             execute_move(operation[0], &mut rope.get_mut(0).unwrap());
 
             for i in 1..rope.len() {
-                execute_drag(*rope.get(i - 1).unwrap(), &mut rope.get_mut(i).unwrap())
+                execute_drag(rope[i - 1], &mut rope.get_mut(i).unwrap())
             }
             visited.insert(*rope.last().unwrap());
         }
