@@ -54,16 +54,9 @@ fn execute_drag(head: Point, tail: &mut Point) {
     let diff_x = head.x - tail.x;
     let diff_y = head.y - tail.y;
 
-    if diff_x.abs() > 1 {
+    if diff_x.abs() > 1 || diff_y.abs() > 1 {
         tail.x += diff_x.signum();
-        if diff_y != 0 {
-            tail.y += diff_y.signum();
-        }
-    } else if diff_y.abs() > 1 {
         tail.y += diff_y.signum();
-        if diff_x != 0 {
-            tail.x += diff_x.signum();
-        }
     }
 }
 
