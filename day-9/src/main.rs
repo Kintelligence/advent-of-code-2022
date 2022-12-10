@@ -30,7 +30,6 @@ fn part_1(reader: &mut Reader) -> usize {
             visited.insert(tail.clone());
         }
     });
-    //print(visited.clone());
     visited.len()
 }
 
@@ -78,6 +77,5 @@ fn part_2(reader: &mut Reader) -> usize {
             visited.insert(*rope.last().unwrap());
         }
     });
-    //print(visited.clone());
     visited.len()
 }
