@@ -1,54 +1,57 @@
 extern crate shared;
 
+use std::time::SystemTime;
+
 use shared::io::Reader;
 
 fn main() {
-    part_1_2(&mut Reader::open("input.txt").expect("expected reader"));
-}
+    let start = SystemTime::now();
 
-fn part_1_2(reader: &mut Reader) {
-    let mut history: Vec<i32> = Vec::new();
+    let mut history = [0; 241];
     let mut current: i32 = 1;
-    history.push(current);
-    history.push(current);
+    let mut offset: usize = 0;
+    history[offset] = current;
 
-    reader.for_each(|line| {
-        let line = line.expect("should be line");
-        let words: Vec<&str> = line.trim_end().split(' ').collect();
-        match words[0] {
-            "noop" => {
-                history.push(current);
+    Reader::open("input.txt")
+        .expect("expected reader")
+        .for_each(|line| {
+            let line = line.expect("should be line");
+            let words: Vec<&str> = line.trim_end().split(' ').collect();
+            match words[0] {
+                "noop" => {
+                    offset += 1;
+                    history[offset] = current;
+                }
+                "addx" => {
+                    offset += 1;
+                    history[offset] = current;
+                    current += words[1].parse::<i32>().unwrap();
+                    offset += 1;
+                    history[offset] = current;
+                }
+                _ => panic!(),
             }
-            "addx" => {
-                history.push(current);
-                current += words[1].parse::<i32>().unwrap();
-                history.push(current);
-            }
-            _ => panic!(),
-        }
-    });
+        });
 
-    let indexes: Vec<usize> = vec![20, 60, 100, 140, 180, 220];
+    let indexes: [usize; 6] = [20, 60, 100, 140, 180, 220];
+    let sum: i32 = indexes.map(|i| i as i32 * history[i - 1]).iter().sum();
+    println!("{}", sum);
 
-    let mut result = 0;
-
-    for i in indexes {
-        let val = i as i32 * history[i];
-        dbg!(i, history[i], val);
-        result += val;
-    }
-
-    println!("{}", result);
-
-    for i in 0..history.len() - 2 {
+    for i in 0..history.len() {
         if i % 40 == 0 {
             println!();
         }
 
-        if (history[i + 1] - (i as i32) % 40).abs() < 2 {
+        if (history[i] - (i as i32) % 40).abs() < 2 {
             print!("#");
         } else {
             print!(" ");
         }
     }
+
+    let end = SystemTime::now();
+    println!(
+        "Total time: {}µs",
+        end.duration_since(start).unwrap().as_micros()
+    );
 }
