@@ -1,31 +1,56 @@
 extern crate shared;
 
-use std::collections::BinaryHeap;
+use std::{collections::BinaryHeap, time::SystemTime};
 
 use shared::io::Reader;
 
 fn main() {
-    let result = part_1(&mut Reader::open("sample.txt").expect("expected reader"));
+    let start = SystemTime::now();
+    let result = part_1(&mut Reader::open("input.txt").expect("expected reader"));
 
     println!("{result}");
 
-    let result = part_2(&mut Reader::open("sample.txt").expect("expected reader"));
+    let middle = SystemTime::now();
+    println!(
+        "Part 1: {}µs",
+        middle.duration_since(start).unwrap().as_micros()
+    );
+
+    let result = part_2(&mut Reader::open("input.txt").expect("expected reader"));
 
     println!("{result}");
+
+    let end = SystemTime::now();
+
+    println!(
+        "Part 2: {}µs",
+        end.duration_since(middle).unwrap().as_micros()
+    );
+
+    println!(
+        "Total time: {}µs",
+        end.duration_since(start).unwrap().as_micros()
+    );
 }
 
 fn part_1(reader: &mut Reader) -> u32 {
-    let (map, x, y) = parse(reader);
-
+    let (map, x, y, _) = parse(reader);
     dijkstra(&map, x, y)
 }
 
 fn part_2(reader: &mut Reader) -> u32 {
-    0
+    let (map, _, _, starts) = parse(reader);
+
+    starts
+        .iter()
+        .map(|(x, y)| dijkstra(&map, *x, *y))
+        .min()
+        .expect("expect min")
 }
 
-fn parse(reader: &mut Reader) -> (Vec<Vec<Node>>, usize, usize) {
+fn parse(reader: &mut Reader) -> (Vec<Vec<Node>>, usize, usize, Vec<(usize, usize)>) {
     let mut y: usize = 0;
+    let mut list = Vec::new();
 
     let mut start_x: usize = 0;
     let mut start_y: usize = 0;
@@ -44,8 +69,13 @@ fn parse(reader: &mut Reader) -> (Vec<Vec<Node>>, usize, usize) {
                         letter: c,
                         height: (match c {
                             'S' => {
+                                list.push((x, y));
                                 start_x = x;
                                 start_y = y;
+                                'a'
+                            }
+                            'a' => {
+                                list.push((x, y));
                                 'a'
                             }
                             'E' => 'z',
@@ -64,7 +94,7 @@ fn parse(reader: &mut Reader) -> (Vec<Vec<Node>>, usize, usize) {
         })
         .collect();
 
-    (map, start_y, start_x)
+    (map, start_x, start_y, list)
 }
 
 fn dijkstra(map: &Vec<Vec<Node>>, x: usize, y: usize) -> u32 {
@@ -91,14 +121,26 @@ fn dijkstra(map: &Vec<Vec<Node>>, x: usize, y: usize) -> u32 {
         }
     }
 
-    0
+    u32::MAX
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq)]
 struct Priority {
     cost: u32,
     x: usize,
     y: usize,
+}
+
+impl Ord for Priority {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.cost.cmp(&self.cost)
+    }
+}
+
+impl PartialOrd for Priority {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        other.cost.partial_cmp(&self.cost)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
