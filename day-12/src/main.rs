@@ -34,26 +34,23 @@ fn main() {
 }
 
 fn part_1(reader: &mut Reader) -> u32 {
-    let (map, x, y, _) = parse(reader);
+    let (map, x, y, _, _) = parse(reader);
     dijkstra(&map, x, y)
 }
 
 fn part_2(reader: &mut Reader) -> u32 {
-    let (map, _, _, starts) = parse(reader);
+    let (map, _, _, x, y) = parse(reader);
 
-    starts
-        .iter()
-        .map(|(x, y)| dijkstra(&map, *x, *y))
-        .min()
-        .expect("expect min")
+    dijkstra2(&map, x, y)
 }
 
-fn parse(reader: &mut Reader) -> (Vec<Vec<Node>>, usize, usize, Vec<(usize, usize)>) {
+fn parse(reader: &mut Reader) -> (Vec<Vec<Node>>, usize, usize, usize, usize) {
     let mut y: usize = 0;
-    let mut list = Vec::new();
 
     let mut start_x: usize = 0;
     let mut start_y: usize = 0;
+    let mut end_x: usize = 0;
+    let mut end_y: usize = 0;
 
     let map = reader
         .map(|l| {
@@ -69,16 +66,15 @@ fn parse(reader: &mut Reader) -> (Vec<Vec<Node>>, usize, usize, Vec<(usize, usiz
                         letter: c,
                         height: (match c {
                             'S' => {
-                                list.push((x, y));
                                 start_x = x;
                                 start_y = y;
                                 'a'
                             }
-                            'a' => {
-                                list.push((x, y));
-                                'a'
+                            'E' => {
+                                end_x = x;
+                                end_y = y;
+                                'z'
                             }
-                            'E' => 'z',
                             _ => c,
                         } as u32
                             - 'a' as u32) as u16,
@@ -94,7 +90,7 @@ fn parse(reader: &mut Reader) -> (Vec<Vec<Node>>, usize, usize, Vec<(usize, usiz
         })
         .collect();
 
-    (map, start_x, start_y, list)
+    (map, start_x, start_y, end_x, end_y)
 }
 
 fn dijkstra(map: &Vec<Vec<Node>>, x: usize, y: usize) -> u32 {
@@ -110,6 +106,33 @@ fn dijkstra(map: &Vec<Vec<Node>>, x: usize, y: usize) -> u32 {
         }
 
         for (n_x, n_y) in map[y][x].neighbours(map) {
+            if cost + 1 < cost_map[n_y][n_x] {
+                cost_map[n_y][n_x] = cost + 1;
+                heap.push(Priority {
+                    x: n_x,
+                    y: n_y,
+                    cost: cost + 1,
+                });
+            }
+        }
+    }
+
+    u32::MAX
+}
+
+fn dijkstra2(map: &Vec<Vec<Node>>, x: usize, y: usize) -> u32 {
+    let mut cost_map = vec![vec![u32::MAX; map[0].len()]; map.len()];
+    let mut heap = BinaryHeap::new();
+
+    cost_map[y][x] = 0;
+    heap.push(Priority { x, y, cost: 0 });
+
+    while let Some(Priority { x, y, cost }) = heap.pop() {
+        if map[y][x].is_goal2() {
+            return cost;
+        }
+
+        for (n_x, n_y) in map[y][x].neighbours2(map) {
             if cost + 1 < cost_map[n_y][n_x] {
                 cost_map[n_y][n_x] = cost + 1;
                 heap.push(Priority {
@@ -178,6 +201,39 @@ impl Node {
             let y = y.unwrap();
 
             if x < width && y < height && map[y][x].height <= self.height + 1 {
+                list.push((x, y));
+            }
+        }
+
+        list
+    }
+
+    fn is_goal2(&self) -> bool {
+        self.letter == 'a'
+    }
+
+    fn neighbours2(&self, map: &Vec<Vec<Node>>) -> Vec<(usize, usize)> {
+        let mut list = Vec::with_capacity(4);
+
+        let adjacent = [
+            (Some(self.x + 1), Some(self.y)),
+            (Some(self.x), Some(self.y + 1)),
+            (self.x.checked_sub(1), Some(self.y)),
+            (Some(self.x), self.y.checked_sub(1)),
+        ];
+
+        let height = map.len();
+        let width = map[0].len();
+
+        for (x, y) in adjacent {
+            if x.is_none() || y.is_none() {
+                continue;
+            }
+
+            let x = x.unwrap();
+            let y = y.unwrap();
+
+            if x < width && y < height && self.height <= map[y][x].height + 1 {
                 list.push((x, y));
             }
         }
