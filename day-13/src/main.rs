@@ -2,38 +2,70 @@ extern crate serde;
 extern crate shared;
 
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
+use std::time::SystemTime;
 
 use shared::io::Reader;
 
 fn main() {
-    let result = part_1(&mut Reader::open("input.txt").expect("expected reader"));
+    let start = SystemTime::now();
+
+    let mut list: Vec<Item> = parse("input.txt");
+
+    let parse = SystemTime::now();
+    println!(
+        "Parsing: {}µs",
+        parse.duration_since(start).unwrap().as_micros()
+    );
+
+    let result = part_1(&list);
 
     println!("{result}");
 
-    let result = part_2(&mut Reader::open("input.txt").expect("expected reader"));
+    let middle = SystemTime::now();
+    println!(
+        "Part 1: {}µs",
+        middle.duration_since(parse).unwrap().as_micros()
+    );
+
+    let result = part_2(&mut list);
 
     println!("{result}");
+
+    let end = SystemTime::now();
+
+    println!(
+        "Part 2: {}µs",
+        end.duration_since(middle).unwrap().as_micros()
+    );
+
+    println!(
+        "Total time: {}µs",
+        end.duration_since(start).unwrap().as_micros()
+    );
 }
 
-fn part_1(reader: &mut Reader) -> u32 {
-    let mut index = 0;
-
-    reader
+fn parse(input: &str) -> Vec<Item> {
+    Reader::open(input)
+        .expect("expected reader")
         .filter_map(|line| {
             let line = line.unwrap();
             if line.trim().is_empty() {
                 return None;
             } else {
-                return Some(line);
+                return Some(serde_json::from_str::<Item>(&line).unwrap());
             }
         })
-        .collect::<Vec<Rc<String>>>()
-        .chunks(2)
+        .collect()
+}
+
+fn part_1(list: &Vec<Item>) -> u32 {
+    let mut index = 0;
+
+    list.chunks(2)
         .map(|lines| {
             index += 1;
-            let left = serde_json::from_str::<Item>(&lines[0]).unwrap();
-            let right = serde_json::from_str::<Item>(&lines[1]).unwrap();
+            let left = &lines[0];
+            let right = &lines[1];
 
             if left.cmp(&right).is_le() {
                 return index;
@@ -43,34 +75,16 @@ fn part_1(reader: &mut Reader) -> u32 {
         .sum()
 }
 
-fn part_2(reader: &mut Reader) -> usize {
-    let mut list: Vec<Item> = reader
-        .filter_map(|line| {
-            let line = line.unwrap();
-            if line.trim().is_empty() {
-                return None;
-            } else {
-                return Some(serde_json::from_str::<Item>(&line).unwrap());
-            }
-        })
-        .collect();
-
+fn part_2(list: &mut Vec<Item>) -> usize {
     let divider_2 = Item::List(vec![Item::List(vec![Item::Number(2)])]);
     let divider_6 = Item::List(vec![Item::List(vec![Item::Number(6)])]);
 
-    list.push(divider_2);
-    list.push(divider_6);
-    list.sort();
-
-    let divider_2 = Item::List(vec![Item::List(vec![Item::Number(2)])]);
-    let divider_6 = Item::List(vec![Item::List(vec![Item::Number(6)])]);
+    list.push(divider_2.clone());
+    list.push(divider_6.clone());
+    list.sort_unstable();
 
     let index_2 = 1 + list.iter().position(|item| *item == divider_2).unwrap();
     let index_6 = 1 + list.iter().position(|item| *item == divider_6).unwrap();
-
-    dbg!(index_2);
-
-    dbg!(index_6);
 
     index_2 * index_6
 }
