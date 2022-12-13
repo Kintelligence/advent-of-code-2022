@@ -1,15 +1,11 @@
-extern crate serde;
 extern crate shared;
 
-use serde::{Deserialize, Serialize};
-use std::time::SystemTime;
-
-use shared::io::Reader;
+use std::{collections::VecDeque, time::SystemTime};
 
 fn main() {
     let start = SystemTime::now();
 
-    let mut list: Vec<Item> = parse("input.txt");
+    let mut list = parse("input.txt");
 
     let parse = SystemTime::now();
     println!(
@@ -40,18 +36,64 @@ fn main() {
     );
 }
 
-fn parse(input: &str) -> Vec<Item> {
-    Reader::open(input)
-        .expect("expected reader")
-        .filter_map(|line| {
-            let line = line.unwrap();
-            if line.trim().is_empty() {
-                return None;
-            } else {
-                return Some(serde_json::from_str::<Item>(&line).unwrap());
-            }
-        })
-        .collect()
+fn parse(file: &str) -> Vec<Item> {
+    let mut buffer = String::new();
+    shared::io::Reader::open(file).unwrap().read(&mut buffer);
+
+    let mut s = Vec::<Item>::new();
+
+    for line in buffer.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let mut st = VecDeque::<Item>::new();
+        split_keep(line.trim())
+            .iter()
+            .filter(|&&x| x != ",")
+            .map(|x| *x)
+            .for_each(|x| match x {
+                "[" => {
+                    let new_list = Item::List(VecDeque::<Item>::new());
+                    st.push_back(new_list);
+                }
+                "]" => {
+                    if st.len() > 1 {
+                        let last = st.pop_back().unwrap();
+                        match st.iter_mut().last() {
+                            Some(Item::List(list)) => list.push_back(last),
+                            _ => st.push_back(last),
+                        }
+                    }
+                }
+                a => {
+                    let n = a.parse::<u8>().unwrap();
+                    match st.iter_mut().last() {
+                        Some(Item::List(list)) => list.push_back(Item::Number(n)),
+                        _ => st.push_back(Item::Number(n)),
+                    }
+                }
+            });
+
+        s.push(Item::List(st));
+    }
+    s
+}
+
+fn split_keep<'a>(text: &'a str) -> Vec<&'a str> {
+    let mut result = Vec::new();
+    let mut last = 0;
+    for (index, matched) in text.match_indices(|c: char| !(c.is_alphanumeric() || c == '\'')) {
+        if last != index {
+            result.push(&text[last..index]);
+        }
+        result.push(matched);
+        last = index + matched.len();
+    }
+    if last < text.len() {
+        result.push(&text[last..]);
+    }
+    result
 }
 
 fn part_1(list: &Vec<Item>) -> u32 {
@@ -72,8 +114,12 @@ fn part_1(list: &Vec<Item>) -> u32 {
 }
 
 fn part_2(list: &mut Vec<Item>) -> usize {
-    let divider_2 = Item::List(vec![Item::List(vec![Item::Number(2)])]);
-    let divider_6 = Item::List(vec![Item::List(vec![Item::Number(6)])]);
+    let divider_2 = Item::List(VecDeque::from(vec![Item::List(VecDeque::from(vec![
+        Item::Number(2),
+    ]))]));
+    let divider_6 = Item::List(VecDeque::from(vec![Item::List(VecDeque::from(vec![
+        Item::Number(6),
+    ]))]));
 
     list.push(divider_2.clone());
     list.push(divider_6.clone());
@@ -85,11 +131,10 @@ fn part_2(list: &mut Vec<Item>) -> usize {
     index_2 * index_6
 }
 
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-#[serde(untagged)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 enum Item {
     Number(u8),
-    List(Vec<Item>),
+    List(VecDeque<Item>),
 }
 
 impl PartialOrd for Item {
@@ -103,10 +148,12 @@ impl Ord for Item {
         match self {
             Item::Number(left) => match other {
                 Item::Number(right) => left.cmp(&right),
-                Item::List(_) => Item::List(vec![Item::Number(*left)]).cmp(other),
+                Item::List(_) => Item::List(VecDeque::from(vec![Item::Number(*left)])).cmp(other),
             },
             Item::List(left) => match other {
-                Item::Number(right) => self.cmp(&Item::List(vec![Item::Number(*right)])),
+                Item::Number(right) => {
+                    self.cmp(&Item::List(VecDeque::from(vec![Item::Number(*right)])))
+                }
                 Item::List(right) => {
                     let mut left_list = left.iter();
                     let mut right_list = right.iter();
