@@ -6,7 +6,11 @@ use shared::io::Reader;
 
 fn main() {
     let start = SystemTime::now();
-    let result = part_1(&mut Reader::open("input.txt").expect("expected reader"));
+
+    let (map, x_start, y_start, x_end, y_end) =
+        parse(&mut Reader::open("input.txt").expect("expected reader"));
+
+    let result = part_1(&map, x_start, y_start);
 
     println!("{result}");
 
@@ -16,7 +20,7 @@ fn main() {
         middle.duration_since(start).unwrap().as_micros()
     );
 
-    let result = part_2(&mut Reader::open("input.txt").expect("expected reader"));
+    let result = part_2(&map, x_end, y_end);
 
     println!("{result}");
 
@@ -33,14 +37,11 @@ fn main() {
     );
 }
 
-fn part_1(reader: &mut Reader) -> u32 {
-    let (map, x, y, _, _) = parse(reader);
+fn part_1(map: &Vec<Vec<Node>>, x: usize, y: usize) -> u32 {
     dijkstra(&map, x, y)
 }
 
-fn part_2(reader: &mut Reader) -> u32 {
-    let (map, _, _, x, y) = parse(reader);
-
+fn part_2(map: &Vec<Vec<Node>>, x: usize, y: usize) -> u32 {
     dijkstra2(&map, x, y)
 }
 
