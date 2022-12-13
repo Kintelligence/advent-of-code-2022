@@ -18,7 +18,6 @@ fn main() {
     );
 
     let result = part_1(&list);
-
     println!("{result}");
 
     let middle = SystemTime::now();
@@ -28,16 +27,13 @@ fn main() {
     );
 
     let result = part_2(&mut list);
-
     println!("{result}");
 
     let end = SystemTime::now();
-
     println!(
         "Part 2: {}µs",
         end.duration_since(middle).unwrap().as_micros()
     );
-
     println!(
         "Total time: {}µs",
         end.duration_since(start).unwrap().as_micros()
