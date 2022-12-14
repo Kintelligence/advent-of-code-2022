@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, time::SystemTime};
+use std::time::SystemTime;
 
 fn main() {
     let start = SystemTime::now();
@@ -13,8 +13,6 @@ fn main() {
         "Part 1: {}µs",
         middle.duration_since(start).unwrap().as_micros()
     );
-
-    let start = SystemTime::now();
 
     let mut map = parse_2("input.txt");
     let result = part_2(&mut map);
@@ -89,11 +87,11 @@ fn _print_map(map: &[[u8; 200]; 200]) {
 }
 
 fn part_1(map: &mut [[u8; 200]; 200]) -> u32 {
-    let mut active_list: VecDeque<(u16, u16)> = VecDeque::new();
+    let mut active_list: Vec<(u16, u16)> = Vec::with_capacity(1500);
     let mut total = 0;
     loop {
         map[50][0] = 2;
-        active_list.push_back((50, 0));
+        active_list.push((50, 0));
 
         let mut settled = 0;
         let mut end = false;
@@ -125,7 +123,7 @@ fn part_1(map: &mut [[u8; 200]; 200]) -> u32 {
         total += settled;
 
         for _ in 0..settled {
-            active_list.pop_front();
+            active_list.remove(0);
         }
 
         if end {
@@ -198,50 +196,43 @@ fn _print_map_2(map: &[[u8; 200]; 1000]) {
 }
 
 fn part_2(map: &mut [[u8; 200]; 1000]) -> u32 {
-    let mut active_list: VecDeque<(u16, u16)> = VecDeque::new();
-    let mut total = 0;
-    loop {
-        if map[500][0] == 3 {
-            return total;
-        }
+    let mut visitor_map: [[u8; 200]; 1000] = [[0; 200]; 1000];
+    let mut visited = 0;
+    let mut queue: Vec<Sand> = Vec::with_capacity(3000);
 
-        active_list.push_back((500, 0));
+    queue.push(Sand { x: 500, y: 0 });
 
-        let mut settled = 0;
-        let mut end = false;
-
-        for i in 0..active_list.len() {
-            let mut sand = active_list.get_mut(i).unwrap();
-
-            if map[sand.0 as usize][(sand.1 + 1) as usize] == 0 {
-                sand.1 += 1;
-                while map[sand.0 as usize][(sand.1 + 1) as usize] == 0 {
-                    sand.1 += 1;
-                    if sand.1 >= (map[0].len() - 1) as u16 {
-                        end = true;
-                        break;
-                    }
-                }
-            } else if map[(sand.0 - 1) as usize][(sand.1 + 1) as usize] == 0 {
-                sand.1 += 1;
-                sand.0 -= 1;
-            } else if map[(sand.0 + 1) as usize][(sand.1 + 1) as usize] == 0 {
-                sand.1 += 1;
-                sand.0 += 1;
-            } else {
-                map[sand.0 as usize][sand.1 as usize] = 3;
-                settled += 1;
+    while let Some(sand) = queue.pop() {
+        visited += 1;
+        sand.neighbours(map).iter().for_each(|n| {
+            if visitor_map[n.x as usize][n.y as usize] == 0 {
+                visitor_map[n.x as usize][n.y as usize] = 1;
+                queue.push(*n);
             }
-        }
+        })
+    }
 
-        total += settled;
+    visited
+}
 
-        for _ in 0..settled {
-            active_list.pop_front();
-        }
+#[derive(Clone, Copy)]
+struct Sand {
+    x: u16,
+    y: u16,
+}
 
-        if end {
-            return total;
-        }
+impl Sand {
+    fn neighbours(&self, map: &[[u8; 200]; 1000]) -> Vec<Sand> {
+        const DIRS: [(i32, i32); 3] = [(0, 1), (-1, 1), (1, 1)];
+
+        DIRS.iter()
+            .filter(|dir| {
+                map[(self.x as i32 + dir.0) as usize][(self.y as i32 + dir.1) as usize] == 0
+            })
+            .map(|dir| Sand {
+                x: (self.x as i32 + dir.0) as u16,
+                y: (self.y as i32 + dir.1) as u16,
+            })
+            .collect()
     }
 }
