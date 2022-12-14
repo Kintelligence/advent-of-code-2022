@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::{collections::VecDeque, time::SystemTime};
 
 fn main() {
     let start = SystemTime::now();
@@ -86,50 +86,28 @@ fn _print_map(map: &[[u8; 200]; 200]) {
     }
 }
 
-fn part_1(map: &mut [[u8; 200]; 200]) -> u32 {
-    let mut active_list: Vec<(u16, u16)> = Vec::with_capacity(1500);
-    let mut total = 0;
-    loop {
-        map[50][0] = 2;
-        active_list.push((50, 0));
+fn part_1(map: &mut [[u8; 200]; 200]) -> u16 {
+    let mut visited = 0;
+    let mut queue: VecDeque<(Sand, u16)> = VecDeque::with_capacity(2000);
 
-        let mut settled = 0;
-        let mut end = false;
+    queue.push_back((Sand { x: 50, y: 0 }, 1));
 
-        for i in 0..active_list.len() {
-            let mut sand = active_list.get_mut(i).unwrap();
+    while let Some((sand, cost)) = queue.pop_back() {
+        visited += 1;
 
-            if map[sand.0 as usize][(sand.1 + 1) as usize] == 0 {
-                sand.1 += 1;
-                while map[sand.0 as usize][(sand.1 + 1) as usize] == 0 {
-                    sand.1 += 1;
-                    if sand.1 >= (map[0].len() - 1) as u16 {
-                        end = true;
-                        break;
-                    }
-                }
-            } else if map[(sand.0 - 1) as usize][(sand.1 + 1) as usize] == 0 {
-                sand.1 += 1;
-                sand.0 -= 1;
-            } else if map[(sand.0 + 1) as usize][(sand.1 + 1) as usize] == 0 {
-                sand.1 += 1;
-                sand.0 += 1;
-            } else {
-                map[sand.0 as usize][sand.1 as usize] = 3;
-                settled += 1;
+        if sand.goal() {
+            return visited - cost;
+        };
+
+        sand.neighbours_small(map).iter().for_each(|n| {
+            if map[n.x as usize][n.y as usize] == 0 {
+                map[n.x as usize][n.y as usize] = 5;
+                queue.push_back((*n, cost + 1));
             }
-        }
-
-        total += settled;
-
-        for _ in 0..settled {
-            active_list.remove(0);
-        }
-
-        if end {
-            return total;
-        }
+        });
     }
+
+    return 0;
 }
 
 fn parse_2(file: &str) -> [[u8; 200]; 1000] {
@@ -196,7 +174,6 @@ fn _print_map_2(map: &[[u8; 200]; 1000]) {
 }
 
 fn part_2(map: &mut [[u8; 200]; 1000]) -> u32 {
-    let mut visitor_map: [[u8; 200]; 1000] = [[0; 200]; 1000];
     let mut visited = 0;
     let mut queue: Vec<Sand> = Vec::with_capacity(30000);
 
@@ -204,9 +181,9 @@ fn part_2(map: &mut [[u8; 200]; 1000]) -> u32 {
 
     while let Some(sand) = queue.pop() {
         visited += 1;
-        sand.neighbours(map, &visitor_map).iter().for_each(|n| {
-            if visitor_map[n.x as usize][n.y as usize] == 0 {
-                visitor_map[n.x as usize][n.y as usize] = 1;
+        sand.neighbours(map).iter().for_each(|n| {
+            if map[n.x as usize][n.y as usize] == 0 {
+                map[n.x as usize][n.y as usize] = 5;
                 queue.push(*n);
             }
         })
@@ -222,7 +199,7 @@ struct Sand {
 }
 
 impl Sand {
-    fn neighbours(&self, map: &[[u8; 200]; 1000], visitor_map: &[[u8; 200]; 1000]) -> Vec<Sand> {
+    fn neighbours(&self, map: &[[u8; 200]; 1000]) -> Vec<Sand> {
         const DIRS: [(i32, i32); 3] = [(0, 1), (-1, 1), (1, 1)];
 
         DIRS.iter()
@@ -232,11 +209,33 @@ impl Sand {
                     (self.y as i32 + dir.1) as usize,
                 )
             })
-            .filter(|dir| visitor_map[dir.0][dir.1] == 0 && map[dir.0][dir.1] == 0)
+            .filter(|dir| map[dir.0][dir.1] == 0)
             .map(|dir| Sand {
                 x: (dir.0) as u16,
                 y: (dir.1) as u16,
             })
             .collect()
+    }
+
+    fn neighbours_small(&self, map: &[[u8; 200]; 200]) -> Vec<Sand> {
+        const DIRS: [(i32, i32); 3] = [(1, 1), (-1, 1), (0, 1)];
+
+        DIRS.iter()
+            .map(|dir| {
+                (
+                    (self.x as i32 + dir.0) as usize,
+                    (self.y as i32 + dir.1) as usize,
+                )
+            })
+            .filter(|dir| map[dir.0][dir.1] == 0)
+            .map(|dir| Sand {
+                x: (dir.0) as u16,
+                y: (dir.1) as u16,
+            })
+            .collect()
+    }
+
+    fn goal(&self) -> bool {
+        self.y == 199
     }
 }
