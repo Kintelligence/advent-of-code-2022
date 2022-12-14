@@ -198,13 +198,13 @@ fn _print_map_2(map: &[[u8; 200]; 1000]) {
 fn part_2(map: &mut [[u8; 200]; 1000]) -> u32 {
     let mut visitor_map: [[u8; 200]; 1000] = [[0; 200]; 1000];
     let mut visited = 0;
-    let mut queue: Vec<Sand> = Vec::with_capacity(3000);
+    let mut queue: Vec<Sand> = Vec::with_capacity(30000);
 
     queue.push(Sand { x: 500, y: 0 });
 
     while let Some(sand) = queue.pop() {
         visited += 1;
-        sand.neighbours(map).iter().for_each(|n| {
+        sand.neighbours(map, &visitor_map).iter().for_each(|n| {
             if visitor_map[n.x as usize][n.y as usize] == 0 {
                 visitor_map[n.x as usize][n.y as usize] = 1;
                 queue.push(*n);
@@ -222,16 +222,20 @@ struct Sand {
 }
 
 impl Sand {
-    fn neighbours(&self, map: &[[u8; 200]; 1000]) -> Vec<Sand> {
+    fn neighbours(&self, map: &[[u8; 200]; 1000], visitor_map: &[[u8; 200]; 1000]) -> Vec<Sand> {
         const DIRS: [(i32, i32); 3] = [(0, 1), (-1, 1), (1, 1)];
 
         DIRS.iter()
-            .filter(|dir| {
-                map[(self.x as i32 + dir.0) as usize][(self.y as i32 + dir.1) as usize] == 0
+            .map(|dir| {
+                (
+                    (self.x as i32 + dir.0) as usize,
+                    (self.y as i32 + dir.1) as usize,
+                )
             })
+            .filter(|dir| visitor_map[dir.0][dir.1] == 0 && map[dir.0][dir.1] == 0)
             .map(|dir| Sand {
-                x: (self.x as i32 + dir.0) as u16,
-                y: (self.y as i32 + dir.1) as u16,
+                x: (dir.0) as u16,
+                y: (dir.1) as u16,
             })
             .collect()
     }
