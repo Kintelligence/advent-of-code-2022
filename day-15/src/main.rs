@@ -1,3 +1,7 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use rayon::prelude::*;
+
 fn main() {
     let start = std::time::SystemTime::now();
 
@@ -102,49 +106,52 @@ const MIN: i32 = 0;
 const MAX: i32 = 4000000;
 
 fn part_2(data: &Vec<Sensor>) {
-    let mut found: bool = false;
+    let found: AtomicBool = AtomicBool::new(false);
 
-    for height in (MIN..=MAX).rev() {
-        if found {
-            break;
-        }
-        let mut list: Vec<Range> = Vec::with_capacity(data.len() * 2);
-        data.iter()
-            .filter_map(|sensor| sensor.ranges_on_line(height))
-            .for_each(|line| {
-                list.push(line.0);
-                list.push(line.1);
-            });
+    (MIN..=MAX).into_par_iter().for_each(|height| {
+        if !found.load(Ordering::Relaxed) {
+            let mut list: Vec<Range> = Vec::with_capacity(data.len() * 2);
+            data.iter()
+                .filter_map(|sensor| sensor.ranges_on_line(height))
+                .for_each(|line| {
+                    list.push(line.0);
+                    list.push(line.1);
+                });
 
-        list.sort_unstable();
-        let mut depth: u8 = 0;
-        let mut current: Option<i32> = None;
+            list.sort_unstable();
+            let mut depth: u8 = 0;
+            let mut current: Option<i32> = None;
 
-        for range in list {
-            match range {
-                Range::Start(start) => {
-                    if depth == 0 {
-                        if let Some(end) = current {
-                            if start - end > 1 {
-                                println!("{}", height as u64 + (start + 1) as u64 * MAX as u64);
-                                found = true;
-                                break;
+            for range in list {
+                if found.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                match range {
+                    Range::Start(start) => {
+                        if depth == 0 {
+                            if let Some(end) = current {
+                                if start - end > 1 {
+                                    println!("{}", height as u64 + (start + 1) as u64 * MAX as u64);
+                                    found.store(true, Ordering::Relaxed);
+                                    break;
+                                }
                             }
                         }
+
+                        depth += 1;
                     }
+                    Range::End(end) => {
+                        depth -= 1;
 
-                    depth += 1;
-                }
-                Range::End(end) => {
-                    depth -= 1;
-
-                    if depth == 0 {
-                        current = Some(end);
+                        if depth == 0 {
+                            current = Some(end);
+                        }
                     }
                 }
             }
         }
-    }
+    });
 }
 
 struct Sensor {
