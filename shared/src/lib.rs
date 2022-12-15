@@ -2,7 +2,7 @@ pub mod io {
     use std::{
         fs::File,
         io::{self, prelude::*},
-        path::Path,
+        path::{Path, PathBuf},
         rc::Rc,
     };
 
@@ -13,6 +13,12 @@ pub mod io {
 
     fn new_buf() -> Rc<String> {
         Rc::new(String::with_capacity(1024)) // Tweakable capacity
+    }
+
+    pub fn expand_file_name(file_name: &str) -> PathBuf {
+        std::env::current_dir()
+            .expect("expected directory")
+            .join(Path::new(file_name))
     }
 
     impl Reader {

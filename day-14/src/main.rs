@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, time::SystemTime};
+use std::{
+    collections::{HashSet, VecDeque},
+    time::SystemTime,
+};
 
 fn main() {
     let start = SystemTime::now();
@@ -32,41 +35,48 @@ fn main() {
 }
 
 fn parse(file: &str) -> [[u8; 200]; 200] {
+    let start = SystemTime::now();
     let mut map: [[u8; 200]; 200] = [[0; 200]; 200];
 
     let mut buffer = String::new();
     shared::io::Reader::open(file).unwrap().read(&mut buffer);
-    buffer.lines().for_each(|line| {
-        line.split("->")
-            .map(|point| {
-                let mut coords = point.trim().split(',').map(|c| c.parse::<u16>().unwrap());
-                (coords.next().unwrap(), coords.next().unwrap())
-            })
-            .collect::<Vec<(u16, u16)>>()
-            .windows(2)
-            .for_each(|segment| {
-                let a = segment[0];
-                let b = segment[1];
+    buffer
+        .lines()
+        .collect::<HashSet<_>>()
+        .iter()
+        .for_each(|line| {
+            line.split("->")
+                .map(|point| {
+                    let mut coords = point.trim().split(',').map(|c| c.parse::<u16>().unwrap());
+                    (coords.next().unwrap(), coords.next().unwrap())
+                })
+                .collect::<Vec<(u16, u16)>>()
+                .windows(2)
+                .for_each(|segment| {
+                    let a = segment[0];
+                    let b = segment[1];
 
-                let x_range = match a.0.cmp(&b.0) {
-                    std::cmp::Ordering::Less => (a.0, b.0),
-                    std::cmp::Ordering::Equal => (a.0, b.0),
-                    std::cmp::Ordering::Greater => (b.0, a.0),
-                };
+                    let x_range = match a.0.cmp(&b.0) {
+                        std::cmp::Ordering::Less => (a.0, b.0),
+                        std::cmp::Ordering::Equal => (a.0, b.0),
+                        std::cmp::Ordering::Greater => (b.0, a.0),
+                    };
 
-                let y_range = match a.1.cmp(&b.1) {
-                    std::cmp::Ordering::Less => (a.1, b.1),
-                    std::cmp::Ordering::Equal => (a.1, b.1),
-                    std::cmp::Ordering::Greater => (b.1, a.1),
-                };
+                    let y_range = match a.1.cmp(&b.1) {
+                        std::cmp::Ordering::Less => (a.1, b.1),
+                        std::cmp::Ordering::Equal => (a.1, b.1),
+                        std::cmp::Ordering::Greater => (b.1, a.1),
+                    };
 
-                for x in x_range.0..=x_range.1 {
-                    for y in y_range.0..=y_range.1 {
-                        map[(x - 450) as usize][y as usize] = 1;
+                    for x in x_range.0..=x_range.1 {
+                        for y in y_range.0..=y_range.1 {
+                            map[(x - 450) as usize][y as usize] = 1;
+                        }
                     }
-                }
-            })
-    });
+                })
+        });
+
+    println!("{:?}", start.elapsed());
 
     map
 }
@@ -111,49 +121,56 @@ fn part_1(map: &mut [[u8; 200]; 200]) -> u16 {
 }
 
 fn parse_2(file: &str) -> [[u8; 200]; 1000] {
+    let start = SystemTime::now();
     let mut map: [[u8; 200]; 1000] = [[0; 200]; 1000];
 
     let mut buffer = String::new();
     shared::io::Reader::open(file).unwrap().read(&mut buffer);
     let mut y = 0;
 
-    buffer.lines().for_each(|line| {
-        line.split("->")
-            .map(|point| {
-                let mut coords = point.trim().split(',').map(|c| c.parse::<u16>().unwrap());
-                (coords.next().unwrap(), coords.next().unwrap())
-            })
-            .collect::<Vec<(u16, u16)>>()
-            .windows(2)
-            .for_each(|segment| {
-                let a = segment[0];
-                let b = segment[1];
+    buffer
+        .lines()
+        .collect::<HashSet<_>>()
+        .iter()
+        .for_each(|line| {
+            line.split("->")
+                .map(|point| {
+                    let mut coords = point.trim().split(',').map(|c| c.parse::<u16>().unwrap());
+                    (coords.next().unwrap(), coords.next().unwrap())
+                })
+                .collect::<Vec<(u16, u16)>>()
+                .windows(2)
+                .for_each(|segment| {
+                    let a = segment[0];
+                    let b = segment[1];
 
-                let x_range = match a.0.cmp(&b.0) {
-                    std::cmp::Ordering::Less => (a.0, b.0),
-                    std::cmp::Ordering::Equal => (a.0, b.0),
-                    std::cmp::Ordering::Greater => (b.0, a.0),
-                };
+                    let x_range = match a.0.cmp(&b.0) {
+                        std::cmp::Ordering::Less => (a.0, b.0),
+                        std::cmp::Ordering::Equal => (a.0, b.0),
+                        std::cmp::Ordering::Greater => (b.0, a.0),
+                    };
 
-                let y_range = match a.1.cmp(&b.1) {
-                    std::cmp::Ordering::Less => (a.1, b.1),
-                    std::cmp::Ordering::Equal => (a.1, b.1),
-                    std::cmp::Ordering::Greater => (b.1, a.1),
-                };
+                    let y_range = match a.1.cmp(&b.1) {
+                        std::cmp::Ordering::Less => (a.1, b.1),
+                        std::cmp::Ordering::Equal => (a.1, b.1),
+                        std::cmp::Ordering::Greater => (b.1, a.1),
+                    };
 
-                for x in x_range.0..=x_range.1 {
-                    for y in y_range.0..=y_range.1 {
-                        map[(x) as usize][y as usize] = 1;
+                    for x in x_range.0..=x_range.1 {
+                        for y in y_range.0..=y_range.1 {
+                            map[(x) as usize][y as usize] = 1;
+                        }
                     }
-                }
 
-                y = u16::max(y, y_range.1);
-            })
-    });
+                    y = u16::max(y, y_range.1);
+                })
+        });
 
     for i in 0..1000 {
         map[i][(y + 2) as usize] = 1;
     }
+
+    println!("{:?}", start.elapsed());
 
     map
 }
