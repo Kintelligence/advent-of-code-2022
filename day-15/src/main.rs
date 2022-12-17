@@ -106,10 +106,10 @@ const MIN: i32 = 0;
 const MAX: i32 = 4000000;
 
 fn part_2(data: &Vec<Sensor>) {
-    let found: AtomicBool = AtomicBool::new(false);
+    let done: AtomicBool = AtomicBool::new(false);
 
     (MIN..=MAX).into_par_iter().for_each(|height| {
-        if !found.load(Ordering::Relaxed) {
+        if !done.load(Ordering::Relaxed) {
             let mut list: Vec<Range> = Vec::with_capacity(data.len() * 2);
             data.iter()
                 .filter_map(|sensor| sensor.ranges_on_line(height))
@@ -120,32 +120,29 @@ fn part_2(data: &Vec<Sensor>) {
 
             list.sort_unstable();
             let mut depth: u8 = 0;
-            let mut current: Option<i32> = None;
+            let mut current: i32 = 0;
 
             for range in list {
-                if found.load(Ordering::Relaxed) {
+                if done.load(Ordering::Relaxed) {
                     break;
                 }
 
                 match range {
                     Range::Start(start) => {
                         if depth == 0 {
-                            if let Some(end) = current {
-                                if start - end > 1 {
-                                    println!("{}", height as u64 + (start + 1) as u64 * MAX as u64);
-                                    found.store(true, Ordering::Relaxed);
-                                    break;
-                                }
+                            if start - current == 2 {
+                                println!("{}", height as u64 + (start + 1) as u64 * MAX as u64);
+                                done.store(true, Ordering::Relaxed);
+                                break;
                             }
                         }
-
                         depth += 1;
                     }
                     Range::End(end) => {
                         depth -= 1;
 
                         if depth == 0 {
-                            current = Some(end);
+                            current = end;
                         }
                     }
                 }
@@ -155,18 +152,16 @@ fn part_2(data: &Vec<Sensor>) {
 }
 
 struct Sensor {
-    center: Point,
+    x: i32,
+    y: i32,
     dist: i32,
 }
 
 impl Sensor {
     fn ranges_on_line(&self, height: i32) -> Option<(Range, Range)> {
-        let diff = self.dist - self.center.y.abs_diff(height) as i32;
+        let diff = self.dist - self.y.abs_diff(height) as i32;
         if diff >= 0 {
-            return Some((
-                Range::Start(self.center.x - diff),
-                Range::End(self.center.x + diff),
-            ));
+            return Some((Range::Start(self.x - diff), Range::End(self.x + diff)));
         }
 
         return None;
@@ -174,10 +169,8 @@ impl Sensor {
 
     fn new(center_x: i32, center_y: i32, closest_x: i32, closest_y: i32) -> Self {
         Self {
-            center: Point {
-                x: center_x,
-                y: center_y,
-            },
+            x: center_x,
+            y: center_y,
             dist: (i32::abs_diff(center_x, closest_x) + i32::abs_diff(center_y, closest_y)) as i32,
         }
     }
@@ -204,10 +197,4 @@ impl PartialOrd for Range {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-struct Point {
-    x: i32,
-    y: i32,
 }
