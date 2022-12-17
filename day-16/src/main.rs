@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+
 fn main() {
     let start = std::time::SystemTime::now();
 
-    let data = parse("input.txt");
+    let mut data = parse("input.txt");
 
     println!("Parse: {:?}", start.elapsed());
     let time_1 = std::time::SystemTime::now();
@@ -14,7 +16,7 @@ fn main() {
 
     let time_2 = std::time::SystemTime::now();
 
-    part_2(&data);
+    part_2(&mut data);
 
     println!("Part 2: {:?}", time_2.elapsed());
 
@@ -22,21 +24,23 @@ fn main() {
 }
 
 fn parse(file: &str) -> HashMap<Id, Valve> {
-    std::fs::read_to_string(shared::io::expand_file_name(file))
-        .unwrap()
-        .lines()
-        .map(|line| {
-            let valve = Valve::new(line);
-            (valve.id, valve)
-        })
-        .collect()
+    compact_graph(
+        std::fs::read_to_string(shared::io::expand_file_name(file))
+            .unwrap()
+            .lines()
+            .map(|line| {
+                let valve = Valve::new(line);
+                (valve.id, valve)
+            })
+            .collect(),
+    )
 }
 
 const START: Id = Id {
     value: 'A' as u16 + (('A' as u16) << 8),
 };
 
-fn compact_graph(valves: &HashMap<Id, Valve>) -> (HashMap<Id, Valve>, Vec<Id>) {
+fn compact_graph(valves: HashMap<Id, Valve>) -> HashMap<Id, Valve> {
     let mut map: HashMap<Id, Valve> = HashMap::new();
     let mut node_list: Vec<Id> = Vec::new();
     let mut node_set: HashSet<Id> = HashSet::new();
@@ -56,7 +60,7 @@ fn compact_graph(valves: &HashMap<Id, Valve>) -> (HashMap<Id, Valve>, Vec<Id>) {
         add_paths_for_valve(&mut map, node_list[i], &node_set, &valves);
     }
 
-    (map, node_list)
+    map
 }
 
 fn add_paths_for_valve(
@@ -103,238 +107,123 @@ fn add_paths_for_valve(
     );
 }
 
-const ROUNDS: u16 = 30;
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
+struct State {
+    score: u16,
+    position: Id,
+    opened_valves: [Id; 16],
+    valve_offset: usize,
+}
 
-fn part_1(input: &HashMap<Id, Valve>) {
-    let (map, a) = compact_graph(input);
-    dbg!(a);
+fn solve(map: &HashMap<Id, Valve>, rounds: u16) -> u16 {
+    let start = State {
+        score: 0,
+        position: START,
+        opened_valves: [Id { value: 0 }; 16],
+        valve_offset: 0,
+    };
 
     let mut cost_map: HashMap<State, u16> = HashMap::new();
-    let mut list: VecDeque<(State, u16)> = VecDeque::new();
-    list.push_back((
-        State {
-            score: 0,
-            position: START,
-            opened_valves: [Id { value: 0 }; 10],
-            valve_offset: 0,
-        },
-        0,
-    ));
+    let mut list: Vec<(State, u16)> = Vec::new();
 
-    while let Some((state, cost)) = list.pop_front() {
-        //dbg!(state, cost);
+    list.push((start, 0));
 
-        let valve = &map[&state.position];
-        for i in 0..valve.connections.len() {
-            let connection = valve.connections[i];
+    while let Some((state, cost)) = list.pop() {
+        if let Some(valve) = &map.get(&state.position) {
+            for i in 0..valve.connections.len() {
+                let connection = valve.connections[i];
 
-            if state.opened_valves.contains(&connection.id) {
-                continue;
-            }
-
-            let next_cost = cost + connection.cost;
-
-            if let Some(remaining) = ROUNDS.checked_sub(next_cost) {
-                let next_valve = &map[&connection.id];
-                let mut opened_valves = state.opened_valves.clone();
-                opened_valves[state.valve_offset] = connection.id;
-                //opened_valves.sort_unstable();
-
-                let next_state = State {
-                    score: state.score + next_valve.flow_rate * remaining,
-                    position: connection.id,
-                    opened_valves: opened_valves,
-                    valve_offset: state.valve_offset + 1,
-                };
-
-                if let Some(cached_cost) = cost_map.get(&next_state) {
-                    if cached_cost <= &next_cost {
-                        continue;
-                    }
+                if state.opened_valves.contains(&connection.id) {
+                    continue;
                 }
 
-                list.push_back((next_state, next_cost));
-                cost_map.insert(next_state, next_cost);
+                let next_cost = cost + connection.cost;
+
+                if let Some(remaining) = rounds.checked_sub(next_cost) {
+                    if let Some(next_valve) = &map.get(&connection.id) {
+                        let mut opened_valves = state.opened_valves.clone();
+                        opened_valves[state.valve_offset] = connection.id;
+
+                        let next_state = State {
+                            score: state.score + next_valve.flow_rate * remaining,
+                            position: connection.id,
+                            opened_valves: opened_valves,
+                            valve_offset: state.valve_offset + 1,
+                        };
+
+                        if let Some(cached_cost) = cost_map.get(&next_state) {
+                            if cached_cost <= &next_cost {
+                                continue;
+                            }
+                        }
+
+                        list.push((next_state, next_cost));
+                        cost_map.insert(next_state, next_cost);
+                    }
+                }
             }
+        } else {
+            dbg!(state, cost, map.keys());
         }
     }
 
     let mut vect: Vec<(&State, &u16)> = cost_map.iter().collect();
     vect.sort_unstable();
-    dbg!(vect.last().unwrap());
-}
-
-const COOP_ROUND: u16 = 26;
-
-fn part_2(input: &HashMap<Id, Valve>) {
-    let (map, nodes) = compact_graph(input);
-
-    let mut cost_map: HashMap<EState, (u16, u16)> = HashMap::new();
-    let mut list: VecDeque<(EState, u16, u16)> = VecDeque::new();
-    list.push_back((
-        EState {
-            score: 0,
-            position: START,
-            e_position: START,
-            opened_valves: [Id { value: 0 }; 20],
-            valve_offset: 0,
-        },
-        0,
-        0,
-    ));
-
-    let mut count: u32 = 0;
-
-    while let Some((state, cost, e_cost)) = list.pop_front() {
-        count += 1;
-        if count % 10000 == 0 {
-            dbg!(count);
-            dbg!(state);
-        }
-
-        //dbg!(state, cost);
-        let valve = &map[&state.position];
-        let e_valve = &map[&state.e_position];
-
-        let options: Vec<(Id, u16, u16)> = valve
-            .connections
-            .iter()
-            .filter_map(|connection| {
-                if state.opened_valves.contains(&connection.id) {
-                    return None;
-                }
-
-                let next_cost = cost + connection.cost;
-                if let Some(remaining) = COOP_ROUND.checked_sub(next_cost) {
-                    return Some((connection.id, next_cost, remaining));
-                }
-
-                return None;
-            })
-            .collect();
-
-        let e_options: Vec<(Id, u16, u16)> = e_valve
-            .connections
-            .iter()
-            .filter_map(|connection| {
-                if state.opened_valves.contains(&connection.id) {
-                    return None;
-                }
-
-                let next_cost = e_cost + connection.cost;
-                if let Some(remaining) = COOP_ROUND.checked_sub(next_cost) {
-                    return Some((connection.id, next_cost, remaining));
-                }
-
-                return None;
-            })
-            .collect();
-
-        if options.len() == 0 {
-            for e in e_options {
-                let next_valve = &map[&e.0];
-
-                let mut opened_valves = state.opened_valves.clone();
-                opened_valves[state.valve_offset] = e.0;
-
-                let next_state = EState {
-                    score: state.score + next_valve.flow_rate * e.2,
-                    position: state.position,
-                    e_position: e.0,
-                    opened_valves: opened_valves,
-                    valve_offset: state.valve_offset + 1,
-                };
-
-                if let Some((co, ce)) = cost_map.get(&next_state) {
-                    if co + ce <= e.1 + cost {
-                        continue;
-                    }
-                }
-
-                list.push_back((next_state, cost, e.1));
-                cost_map.insert(next_state, (cost, e.1));
-            }
-        } else if e_options.len() == 0 {
-            for o in options {
-                let next_valve = &map[&o.0];
-
-                let mut opened_valves = state.opened_valves.clone();
-                opened_valves[state.valve_offset] = o.0;
-
-                let next_state = EState {
-                    score: state.score + next_valve.flow_rate * o.2,
-                    position: o.0,
-                    e_position: state.e_position,
-                    opened_valves: opened_valves,
-                    valve_offset: state.valve_offset + 1,
-                };
-
-                if let Some((co, ce)) = cost_map.get(&next_state) {
-                    if co + ce <= e_cost + o.1 {
-                        continue;
-                    }
-                }
-
-                list.push_back((next_state, o.1, e_cost));
-                cost_map.insert(next_state, (o.1, e_cost));
-            }
-        } else {
-            for o in options {
-                for i in 0..e_options.len() {
-                    let e = e_options[i];
-
-                    if o.0 == e.0 {
-                        continue;
-                    }
-
-                    let o_valve = &map[&o.0];
-                    let e_valve = &map[&e.0];
-
-                    let mut opened_valves = state.opened_valves.clone();
-                    opened_valves[state.valve_offset] = o.0;
-                    opened_valves[state.valve_offset + 1] = e.0;
-
-                    let next_state = EState {
-                        score: state.score + (o_valve.flow_rate * o.2) + (e_valve.flow_rate * e.2),
-                        position: o.0,
-                        e_position: e.0,
-                        opened_valves: opened_valves,
-                        valve_offset: state.valve_offset + 2,
-                    };
-
-                    if let Some((co, ce)) = cost_map.get(&next_state) {
-                        if co + ce <= e.1 + o.1 {
-                            continue;
-                        }
-                    }
-
-                    list.push_back((next_state, o.1, e.1));
-                    cost_map.insert(next_state, (o.1, e.1));
-                }
-            }
-        }
+    if let Some((result, _)) = vect.last() {
+        return result.score;
     }
 
-    let mut vect: Vec<(&EState, &(u16, u16))> = cost_map.iter().collect();
-    vect.sort_unstable();
-    dbg!(vect.last().unwrap());
+    0
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
-struct State {
-    score: u16,
-    position: Id,
-    opened_valves: [Id; 10],
-    valve_offset: usize,
+fn part_1(map: &HashMap<Id, Valve>) {
+    println!("{}", solve(map, 30));
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
-struct EState {
-    score: u16,
-    position: Id,
-    e_position: Id,
-    opened_valves: [Id; 20],
-    valve_offset: usize,
+fn part_2(map: &mut HashMap<Id, Valve>) {
+    let nodes: Vec<&Id> = map.keys().collect();
+
+    let len = nodes.len();
+
+    let permutations: Vec<Vec<&Id>> = ((len * 4 / 9)..(len / 2))
+        .map(|count| itertools::Itertools::combinations(nodes.clone().into_iter(), count))
+        .flatten()
+        .collect();
+
+    println!("Solving for {} permutations", permutations.len());
+
+    let result = permutations
+        .into_par_iter()
+        .map(|permutation| {
+            let score = solve(
+                &map.iter()
+                    .filter_map(|(id, valve)| {
+                        if permutation.contains(&id) || id.value.eq(&START.value) {
+                            return Some((*id, valve.clone()));
+                        }
+                        return None;
+                    })
+                    .collect(),
+                26,
+            );
+
+            score
+                + solve(
+                    &map.iter()
+                        .filter_map(|(id, valve)| {
+                            if !permutation.contains(&id) || id.value.eq(&START.value) {
+                                return Some((*id, valve.clone()));
+                            }
+                            return None;
+                        })
+                        .collect(),
+                    26,
+                )
+        })
+        .max()
+        .unwrap();
+
+    println!("{}", result);
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
