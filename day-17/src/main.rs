@@ -1,4 +1,4 @@
-use std::ops::BitOrAssign;
+use std::{collections::HashMap, ops::BitOrAssign};
 
 fn main() {
     let start = std::time::SystemTime::now();
@@ -12,15 +12,13 @@ fn main() {
 
     println!("Part 1: {:?}", time_1.elapsed());
 
-    /*
     let time_2 = std::time::SystemTime::now();
 
-    part_2(&mut data);
+    part_2(&data);
 
     println!("Part 2: {:?}", time_2.elapsed());
 
     println!("Total: {:?}", start.elapsed());
-    */
 }
 
 fn parse(file: &str) -> Vec<Direction> {
@@ -43,19 +41,26 @@ enum Direction {
 }
 
 const SIZE: usize = 5_000_000;
-const PRINT: bool = false;
+const _PRINT: bool = true;
+const _PRINT_ALL: bool = false;
+const TOTAL: usize = 1_000_000_000_000;
+const PART_1_TORAL: usize = 2022;
+const SHAPES: [Shape; 5] = [FLAT, PLUS, CORNER, LINE, BOX];
+//const SHAPES: [Shape; 5] = [FLAT, BOX, FLAT, BOX, FLAT];
+const STATE_SIZE: usize = 10;
+
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
+struct State {
+    shape: usize,
+    wind: usize,
+    top: [Line; STATE_SIZE],
+}
 
 fn part_1(input: &Vec<Direction>) {
-    const SHAPES: [Shape; 5] = [FLAT, PLUS, CORNER, LINE, BOX];
-    //const SHAPES: [Shape; 5] = [FULL, FULL, FULL, FULL, FULL];
     let mut chamber = Chamber::new();
     let mut wind = 0;
 
-    for i in 0..1000000000000 {
-        if i % 10000000 == 0 {
-            println!("{:06}/100000", i / 10000000);
-        }
-
+    for i in 0..PART_1_TORAL {
         let mut shape = SHAPES[i % 5].clone();
         chamber.make_space();
         let mut offset: usize = 0;
@@ -78,11 +83,132 @@ fn part_1(input: &Vec<Direction>) {
         }
     }
 
-    chamber._draw_alone();
+    //chamber._draw_alone();
     println!("{}", chamber.height);
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+fn part_2(input: &Vec<Direction>) {
+    let mut chamber = Chamber::new();
+    let mut wind = 0;
+
+    let mut map: HashMap<State, usize> = HashMap::new();
+    let mut first_match: usize = 0;
+    let mut last_match: usize = 0;
+    let mut first_height: usize = 0;
+    let mut repeats: usize = 1;
+    let mut found_cycle: bool = false;
+    let mut last_index: usize = 0;
+
+    for i in 0..TOTAL {
+        if i > STATE_SIZE {
+            let mut state = State {
+                shape: i % 5,
+                wind: wind,
+                top: [EMPTY; STATE_SIZE],
+            };
+            state
+                .top
+                .copy_from_slice(&chamber.lines[chamber.head - STATE_SIZE..=chamber.head - 1]);
+
+            if let Some(index) = map.get(&state) {
+                if *index == first_match {
+                    repeats += 1;
+                    //println!("Repeats: {}", repeats);
+
+                    if repeats >= 5 {
+                        found_cycle = true;
+                        break;
+                    }
+                } else if last_match + 1 != *index {
+                    repeats = 1;
+                    first_match = *index;
+                    first_height = chamber.height;
+                }
+
+                last_match = *index;
+            } else {
+                repeats = 1;
+                first_match = 0;
+                last_match = 0;
+                map.insert(state, i);
+            }
+        }
+
+        let mut shape = SHAPES[i % 5].clone();
+        chamber.make_space();
+        let mut offset: usize = 0;
+
+        loop {
+            chamber._draw(&shape, offset);
+            if let Some(moved) = shape.push(input[wind], chamber.get_segment(offset)) {
+                shape = moved;
+                chamber._draw(&shape, offset);
+            }
+
+            wind += 1;
+            wind %= input.len();
+            offset += 1;
+
+            if !shape.check(chamber.get_segment(offset)) {
+                chamber.add_shape(&shape, offset - 1);
+                break;
+            }
+        }
+
+        last_index = i;
+    }
+
+    if found_cycle {
+        /*dbg!(
+            first_match,
+            last_match,
+            chamber.height,
+            chamber.head,
+            last_index
+        );*/
+
+        let cycle_height = (chamber.height - first_height) / (repeats - 1);
+        let cycle_length = last_match - first_match + 1;
+        let cycle_count = (TOTAL - last_index) / cycle_length;
+
+        //dbg!((TOTAL - last_index) / cycle_length);
+
+        //dbg!(cycle_count, cycle_height, cycle_length);
+
+        chamber.height += cycle_count * cycle_height;
+
+        //dbg!(chamber.height);
+        //dbg!(last_index + 1 + cycle_count * cycle_length);
+
+        for i in last_index + 1 + cycle_count * cycle_length..TOTAL {
+            let mut shape = SHAPES[i % 5].clone();
+            chamber.make_space();
+            let mut offset: usize = 0;
+
+            loop {
+                chamber._draw(&shape, offset);
+                if let Some(moved) = shape.push(input[wind], chamber.get_segment(offset)) {
+                    shape = moved;
+                    chamber._draw(&shape, offset);
+                }
+
+                wind += 1;
+                wind %= input.len();
+                offset += 1;
+
+                if !shape.check(chamber.get_segment(offset)) {
+                    chamber.add_shape(&shape, offset - 1);
+                    break;
+                }
+            }
+        }
+    }
+
+    //chamber._draw_alone();
+    println!("{}", chamber.height);
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Line {
     bits: u8,
 }
@@ -231,7 +357,7 @@ impl Chamber {
 
     fn make_space(&mut self) {
         if self.head + 6 >= SIZE {
-            //println!("resetting offset");
+            println!("resetting offset {}:{}", self.tail, self.head);
 
             self.lines.copy_within(self.tail..self.head, 3);
             self.head -= self.tail - 3;
@@ -266,7 +392,7 @@ impl Chamber {
     }
 
     fn _draw(&self, shape: &Shape, offset: usize) {
-        if PRINT {
+        if _PRINT_ALL {
             let shape_bot = self.head + 3 - offset;
             let shape_top = self.head + 7 - offset;
 
@@ -287,9 +413,9 @@ impl Chamber {
     }
 
     fn _draw_alone(&self) {
-        if PRINT {
+        if _PRINT {
             println!();
-            for i in (self.tail..self.head + 3).rev() {
+            for i in (0..self.head + 3).rev() {
                 println!("{:#010b}", self.lines[i].bits);
             }
 
