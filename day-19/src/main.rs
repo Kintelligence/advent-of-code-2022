@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 fn main() {
     let start = std::time::SystemTime::now();
 
-    let data = parse("sample.txt");
+    let data = parse("miq.txt");
 
     println!("Parse: {:?}", start.elapsed());
 
@@ -33,14 +33,16 @@ struct Resources {
     ore: u8,
     clay: u8,
     obsidian: u8,
+    geode: u8,
 }
 
 impl Resources {
-    const fn new(ore: u8, clay: u8, obsidian: u8) -> Self {
+    const fn new(ore: u8, clay: u8, obsidian: u8, geode: u8) -> Self {
         Self {
             ore,
             clay,
             obsidian,
+            geode,
         }
     }
 
@@ -49,6 +51,7 @@ impl Resources {
             self.ore.max(other.ore),
             self.clay.max(other.clay),
             self.obsidian.max(other.obsidian),
+            self.geode.max(other.geode),
         )
     }
 
@@ -57,11 +60,16 @@ impl Resources {
             self.ore.checked_add(other.ore).unwrap(),
             self.clay.checked_add(other.clay).unwrap(),
             self.obsidian.checked_add(other.obsidian).unwrap(),
+            self.geode.checked_add(other.geode).unwrap(),
         )
     }
 
     fn checked_sub(&self, other: &Self) -> Option<Self> {
-        if self.ore < other.ore || self.clay < other.clay || self.obsidian < other.obsidian {
+        if self.ore < other.ore
+            || self.clay < other.clay
+            || self.obsidian < other.obsidian
+            || self.geode < other.geode
+        {
             return None;
         }
 
@@ -69,14 +77,16 @@ impl Resources {
             self.ore - other.ore,
             self.clay - other.clay,
             self.obsidian - other.obsidian,
+            self.geode - other.geode,
         ))
     }
 
-    fn _mult(&self, other: u8) -> Self {
+    fn mult(&self, other: u8) -> Self {
         Self::new(
             self.ore.checked_mul(other).unwrap(),
             self.clay.checked_mul(other).unwrap(),
             self.obsidian.checked_mul(other).unwrap(),
+            self.geode.checked_mul(other).unwrap(),
         )
     }
 }
@@ -92,33 +102,36 @@ fn parse(file: &str) -> Vec<Blueprint> {
                 .collect();
 
             Blueprint {
-                ore: Resources::new(segments[0][6].parse().unwrap(), 0, 0),
-                clay: Resources::new(segments[1][4].parse().unwrap(), 0, 0),
+                ore: Resources::new(segments[0][6].parse().unwrap(), 0, 0, 0),
+                clay: Resources::new(segments[1][4].parse().unwrap(), 0, 0, 0),
                 obsidian: Resources::new(
                     segments[2][4].parse().unwrap(),
                     segments[2][7].parse().unwrap(),
+                    0,
                     0,
                 ),
                 geode: Resources::new(
                     segments[3][4].parse().unwrap(),
                     0,
                     segments[3][7].parse().unwrap(),
+                    0,
                 ),
             }
         })
         .collect()
 }
 
+const PRINT: bool = false;
+
 fn part_1(data: &Vec<Blueprint>) {
     let mut result = 0;
     for i in 0..data.len() {
-        print!("Blueprint: {:<3} - ", i + 1);
-        let _ = std::io::Write::flush(&mut std::io::stdout());
         let start = std::time::SystemTime::now();
         let potential = get_potential(&data[i]);
         result += (i + 1) * potential as usize;
         println!(
-            "[ {:<2} : {:<3} : {:<4} ] {:?}",
+            "Blueprint: {:<3} - [ {:<2} : {:<3} : {:<4} ] {:?}",
+            i + 1,
             potential,
             (i + 1) * potential as usize,
             result,
@@ -132,9 +145,8 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
     const MINUTES: u8 = 24;
 
     const START: State = State {
-        resources: Resources::new(0, 0, 0),
-        bots: Resources::new(1, 0, 0),
-        geodes: 0,
+        resources: Resources::new(0, 0, 0, 0),
+        bots: Resources::new(1, 0, 0, 0),
     };
 
     let mut map: HashMap<State, u8> = HashMap::new();
@@ -143,7 +155,7 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
     insert_if_cheaper(&mut map, &START, MINUTES);
     queue.push_back((START, MINUTES));
 
-    let mut geode_max = 0;
+    let mut max_geodes = 0;
 
     let total_costs = blueprint
         .clay
@@ -156,39 +168,33 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
             continue;
         }
 
-        let next = State {
-            resources: state.resources.add(&state.bots),
-            bots: state.bots,
-            geodes: state.geodes,
-        };
-
-        geode_max = geode_max.max(state.geodes);
-
-        if insert_if_cheaper(&mut map, &next, remaining - 1) {
-            queue.push_back((next, remaining - 1));
+        let potential_geodes = state.potential(remaining).geode;
+        if potential_geodes > max_geodes {
+            max_geodes = potential_geodes;
+            println!(
+                "New best state at {} -> Potential Geodes: {} {:?}",
+                remaining, max_geodes, state
+            );
         }
 
-        if let Some(resources) = state.resources.checked_sub(&blueprint.geode) {
-            let next = State {
-                resources: resources.add(&state.bots),
+        {
+            let wait = State {
+                resources: state.resources.add(&state.bots),
                 bots: state.bots,
-                geodes: state.geodes + remaining - 1,
             };
-
-            if insert_if_cheaper(&mut map, &next, remaining - 1) {
-                queue.push_back((next, remaining - 1));
+            if insert_if_cheaper(&mut map, &wait, remaining - 1) {
+                queue.push_back((wait, remaining - 1));
             }
         }
 
-        if state.bots.obsidian < total_costs.obsidian {
-            if let Some(resources) = state.resources.checked_sub(&blueprint.obsidian) {
+        if state.bots.ore < total_costs.ore {
+            if let Some(resources) = state.resources.checked_sub(&blueprint.ore) {
                 let mut next = State {
                     resources: resources.add(&state.bots),
                     bots: state.bots,
-                    geodes: state.geodes,
                 };
 
-                next.bots.obsidian += 1;
+                next.bots.ore += 1;
 
                 if insert_if_cheaper(&mut map, &next, remaining - 1) {
                     queue.push_back((next, remaining - 1));
@@ -201,7 +207,6 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
                 let mut next = State {
                     resources: resources.add(&state.bots),
                     bots: state.bots,
-                    geodes: state.geodes,
                 };
 
                 next.bots.clay += 1;
@@ -212,24 +217,36 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
             }
         }
 
-        if state.bots.ore < total_costs.ore {
-            if let Some(resources) = state.resources.checked_sub(&blueprint.ore) {
+        if state.bots.obsidian < total_costs.obsidian {
+            if let Some(resources) = state.resources.checked_sub(&blueprint.obsidian) {
                 let mut next = State {
                     resources: resources.add(&state.bots),
                     bots: state.bots,
-                    geodes: state.geodes,
                 };
 
-                next.bots.ore += 1;
+                next.bots.obsidian += 1;
 
                 if insert_if_cheaper(&mut map, &next, remaining - 1) {
                     queue.push_back((next, remaining - 1));
                 }
             }
         }
+
+        if let Some(resources) = state.resources.checked_sub(&blueprint.geode) {
+            let mut next = State {
+                resources: resources.add(&state.bots),
+                bots: state.bots,
+            };
+
+            next.bots.geode += 1;
+
+            if insert_if_cheaper(&mut map, &next, remaining - 1) {
+                queue.push_back((next, remaining - 1));
+            }
+        }
     }
 
-    geode_max
+    max_geodes
 }
 
 fn insert_if_cheaper(map: &mut HashMap<State, u8>, state: &State, remaining: u8) -> bool {
@@ -249,11 +266,10 @@ fn insert_if_cheaper(map: &mut HashMap<State, u8>, state: &State, remaining: u8)
 struct State {
     resources: Resources,
     bots: Resources,
-    geodes: u8,
 }
 
 impl State {
-    fn _potential(&self, remaining: u8) -> Resources {
-        self.resources.add(&self.bots._mult(remaining))
+    fn potential(&self, remaining: u8) -> Resources {
+        self.resources.add(&self.bots.mult(remaining))
     }
 }

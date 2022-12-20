@@ -59,6 +59,9 @@
 		},
 		{
 			"path": "day-19"
+		},
+		{
+			"path": "day-20"
 		}
 	],
 	"settings": {}
