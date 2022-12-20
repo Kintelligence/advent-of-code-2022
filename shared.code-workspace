@@ -53,6 +53,12 @@
 		},
 		{
 			"path": "day-17"
+		},
+		{
+			"path": "day-18"
+		},
+		{
+			"path": "day-19"
 		}
 	],
 	"settings": {}

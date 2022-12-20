@@ -23,9 +23,7 @@ fn part_1(reader: &mut Reader) -> u32 {
         .chars()
         .collect::<Vec<char>>()
         .windows(4)
-        .position(|slice| {
-            slice.iter().collect::<HashSet<&char>>().len() == 4)}
-            
+        .position(|slice| slice.iter().collect::<HashSet<&char>>().len() == 4)
         .expect("expect match") as u32
         + 4
 }
