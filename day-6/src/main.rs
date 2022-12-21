@@ -1,5 +1,5 @@
 extern crate shared;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use shared::io::Reader;
 
