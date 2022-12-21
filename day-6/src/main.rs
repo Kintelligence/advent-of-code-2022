@@ -17,8 +17,6 @@ fn part_1(reader: &mut Reader) -> u32 {
     let mut buffer = String::new();
     let input = reader.read_line(&mut buffer);
 
-    let mut dict: HashMap<char, usize> = HashMap::new();
-
     input
         .chars()
         .collect::<Vec<char>>()

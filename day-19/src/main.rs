@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 fn main() {
     let start = std::time::SystemTime::now();
 
-    let data = parse("miq.txt");
+    let data = parse("input.txt");
 
     println!("Parse: {:?}", start.elapsed());
 
@@ -20,77 +20,6 @@ fn main() {
     println!("Total: {:?}", start.elapsed());*/
 }
 
-#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct Blueprint {
-    ore: Resources,
-    clay: Resources,
-    obsidian: Resources,
-    geode: Resources,
-}
-
-#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct Resources {
-    ore: u8,
-    clay: u8,
-    obsidian: u8,
-    geode: u8,
-}
-
-impl Resources {
-    const fn new(ore: u8, clay: u8, obsidian: u8, geode: u8) -> Self {
-        Self {
-            ore,
-            clay,
-            obsidian,
-            geode,
-        }
-    }
-
-    fn maximize(&self, other: &Self) -> Self {
-        Self::new(
-            self.ore.max(other.ore),
-            self.clay.max(other.clay),
-            self.obsidian.max(other.obsidian),
-            self.geode.max(other.geode),
-        )
-    }
-
-    fn add(&self, other: &Self) -> Self {
-        Self::new(
-            self.ore.checked_add(other.ore).unwrap(),
-            self.clay.checked_add(other.clay).unwrap(),
-            self.obsidian.checked_add(other.obsidian).unwrap(),
-            self.geode.checked_add(other.geode).unwrap(),
-        )
-    }
-
-    fn checked_sub(&self, other: &Self) -> Option<Self> {
-        if self.ore < other.ore
-            || self.clay < other.clay
-            || self.obsidian < other.obsidian
-            || self.geode < other.geode
-        {
-            return None;
-        }
-
-        Some(Self::new(
-            self.ore - other.ore,
-            self.clay - other.clay,
-            self.obsidian - other.obsidian,
-            self.geode - other.geode,
-        ))
-    }
-
-    fn mult(&self, other: u8) -> Self {
-        Self::new(
-            self.ore.checked_mul(other).unwrap(),
-            self.clay.checked_mul(other).unwrap(),
-            self.obsidian.checked_mul(other).unwrap(),
-            self.geode.checked_mul(other).unwrap(),
-        )
-    }
-}
-
 fn parse(file: &str) -> Vec<Blueprint> {
     std::fs::read_to_string(shared::io::expand_file_name(file))
         .unwrap()
@@ -102,19 +31,17 @@ fn parse(file: &str) -> Vec<Blueprint> {
                 .collect();
 
             Blueprint {
-                ore: Resources::new(segments[0][6].parse().unwrap(), 0, 0, 0),
-                clay: Resources::new(segments[1][4].parse().unwrap(), 0, 0, 0),
+                ore: Resources::new(segments[0][6].parse().unwrap(), 0, 0),
+                clay: Resources::new(segments[1][4].parse().unwrap(), 0, 0),
                 obsidian: Resources::new(
                     segments[2][4].parse().unwrap(),
                     segments[2][7].parse().unwrap(),
-                    0,
                     0,
                 ),
                 geode: Resources::new(
                     segments[3][4].parse().unwrap(),
                     0,
                     segments[3][7].parse().unwrap(),
-                    0,
                 ),
             }
         })
@@ -145,8 +72,9 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
     const MINUTES: u8 = 24;
 
     const START: State = State {
-        resources: Resources::new(0, 0, 0, 0),
-        bots: Resources::new(1, 0, 0, 0),
+        resources: Resources::new(0, 0, 0),
+        bots: Resources::new(1, 0, 0),
+        geodes: 0,
     };
 
     let mut map: HashMap<State, u8> = HashMap::new();
@@ -168,19 +96,21 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
             continue;
         }
 
-        let potential_geodes = state.potential(remaining).geode;
-        if potential_geodes > max_geodes {
-            max_geodes = potential_geodes;
-            println!(
-                "New best state at {} -> Potential Geodes: {} {:?}",
-                remaining, max_geodes, state
-            );
+        if state.geodes > max_geodes {
+            max_geodes = state.geodes;
+            if PRINT {
+                println!(
+                    "New best state at {} -> Potential Geodes: {} {:?}",
+                    remaining, max_geodes, state
+                );
+            }
         }
 
         {
             let wait = State {
                 resources: state.resources.add(&state.bots),
                 bots: state.bots,
+                geodes: state.geodes,
             };
             if insert_if_cheaper(&mut map, &wait, remaining - 1) {
                 queue.push_back((wait, remaining - 1));
@@ -192,6 +122,7 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
                 let mut next = State {
                     resources: resources.add(&state.bots),
                     bots: state.bots,
+                    geodes: state.geodes,
                 };
 
                 next.bots.ore += 1;
@@ -207,6 +138,7 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
                 let mut next = State {
                     resources: resources.add(&state.bots),
                     bots: state.bots,
+                    geodes: state.geodes,
                 };
 
                 next.bots.clay += 1;
@@ -222,6 +154,7 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
                 let mut next = State {
                     resources: resources.add(&state.bots),
                     bots: state.bots,
+                    geodes: state.geodes,
                 };
 
                 next.bots.obsidian += 1;
@@ -233,12 +166,11 @@ fn get_potential(blueprint: &Blueprint) -> u8 {
         }
 
         if let Some(resources) = state.resources.checked_sub(&blueprint.geode) {
-            let mut next = State {
+            let next = State {
                 resources: resources.add(&state.bots),
                 bots: state.bots,
+                geodes: state.geodes + remaining as u8 - 1,
             };
-
-            next.bots.geode += 1;
 
             if insert_if_cheaper(&mut map, &next, remaining - 1) {
                 queue.push_back((next, remaining - 1));
@@ -253,7 +185,7 @@ fn insert_if_cheaper(map: &mut HashMap<State, u8>, state: &State, remaining: u8)
     //let key = state.potential(remaining);
     let key = *state;
     if let Some(cache) = map.get(&key) {
-        if *cache <= remaining {
+        if *cache >= remaining {
             return false;
         }
     }
@@ -266,6 +198,68 @@ fn insert_if_cheaper(map: &mut HashMap<State, u8>, state: &State, remaining: u8)
 struct State {
     resources: Resources,
     bots: Resources,
+    geodes: u8,
+}
+
+#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct Blueprint {
+    ore: Resources,
+    clay: Resources,
+    obsidian: Resources,
+    geode: Resources,
+}
+
+#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct Resources {
+    ore: u8,
+    clay: u8,
+    obsidian: u8,
+}
+
+impl Resources {
+    const fn new(ore: u8, clay: u8, obsidian: u8) -> Self {
+        Self {
+            ore,
+            clay,
+            obsidian,
+        }
+    }
+
+    fn maximize(&self, other: &Self) -> Self {
+        Self::new(
+            self.ore.max(other.ore),
+            self.clay.max(other.clay),
+            self.obsidian.max(other.obsidian),
+        )
+    }
+
+    fn add(&self, other: &Self) -> Self {
+        Self::new(
+            self.ore.checked_add(other.ore).unwrap(),
+            self.clay.checked_add(other.clay).unwrap(),
+            self.obsidian.checked_add(other.obsidian).unwrap(),
+        )
+    }
+
+    fn checked_sub(&self, other: &Self) -> Option<Self> {
+        if self.ore < other.ore || self.clay < other.clay || self.obsidian < other.obsidian {
+            return None;
+        }
+
+        Some(Self::new(
+            self.ore - other.ore,
+            self.clay - other.clay,
+            self.obsidian - other.obsidian,
+        ))
+    }
+
+    fn _mult(&self, other: u8) -> Self {
+        Self::new(
+            self.ore.checked_mul(other).unwrap(),
+            self.clay.checked_mul(other).unwrap(),
+            self.obsidian.checked_mul(other).unwrap(),
+        )
+    }
 }
 
 impl State {
