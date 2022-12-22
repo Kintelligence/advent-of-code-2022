@@ -153,7 +153,6 @@ fn part_2(data: &Vec<i16>) {
             let i = list.iter().position(|c| c.order == m).unwrap();
 
             let current = list.remove(i);
-
             let index = (current.offset + i) % (size - 1);
 
             if PRINT_2 {
@@ -171,7 +170,7 @@ fn part_2(data: &Vec<i16>) {
         }
     }
 
-    let start = list.iter().position(|c| c.offset == 0).unwrap();
+    let start = list.iter().position(|c| c.value == 0).unwrap();
 
     println!(
         "Result: {},{},{} -> {}",
