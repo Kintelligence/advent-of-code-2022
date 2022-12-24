@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 fn main() {
     let start = std::time::SystemTime::now();
@@ -28,11 +28,11 @@ fn part_1(map: &Map) {
 
     let state = State {
         pos: start,
-        bliz: map.init,
+        cycle: 0,
     };
 
-    let (_, cost) = solve(&state, map, goal).unwrap();
-    println!("Cost: {}", cost);
+    let (_, turn) = solve(&state, map, goal).unwrap();
+    println!("Cost: {}", turn);
 }
 
 fn part_2(map: &Map) {
@@ -41,20 +41,20 @@ fn part_2(map: &Map) {
 
     let state = State {
         pos: start,
-        bliz: map.init,
+        cycle: 0,
     };
 
     let mut total = 0;
 
-    let (state, cost) = solve(&state, map, goal).unwrap();
-    total += cost;
-    println!("1: {}", cost);
-    let (state, cost) = solve(&state, map, start).unwrap();
-    total += cost;
-    println!("2: {}", cost);
-    let (_, cost) = solve(&state, map, goal).unwrap();
-    total += cost;
-    println!("3: {}", cost);
+    let (state, turn) = solve(&state, map, goal).unwrap();
+    total += turn;
+    println!("1: {}", turn);
+    let (state, turn) = solve(&state, map, start).unwrap();
+    total += turn;
+    println!("2: {}", turn);
+    let (_, turn) = solve(&state, map, goal).unwrap();
+    total += turn;
+    println!("3: {}", turn);
     println!("Total: {}", total);
 }
 
@@ -65,25 +65,29 @@ fn solve(start: &State, map: &Map, goal: Position) -> Option<(State, u16)> {
     queue.push_back((*start, 0));
     cache.insert(*start, 0);
 
-    while let Some((state, cost)) = queue.pop_front() {
+    while let Some((state, turn)) = queue.pop_front() {
         if PRINT {
             draw(map, &state);
         }
-        let bliz = move_bliz(&state.bliz, &map);
+        let bliz = &map.bliz[((state.cycle + 1) % map.cycle_length) as usize];
         let mut options: Vec<State> = Vec::new();
         for (x_d, y_d) in DIRECTIONS {
             if let Some(next) = state.pos.checked_push(x_d, y_d, map) {
                 let next_state = State {
                     pos: next,
-                    bliz: bliz,
+                    cycle: (state.cycle + 1) % map.cycle_length,
                 };
 
+                if let Some(_) = bliz.get(&next) {
+                    continue;
+                }
+
                 if next == goal {
-                    return Some((next_state, cost + 1));
+                    return Some((next_state, turn + 1));
                 }
 
                 if let Some(cached) = cache.get(&next_state) {
-                    if *cached > cost + 1 {
+                    if *cached > turn + 1 {
                         options.push(next_state);
                     }
                 } else {
@@ -92,23 +96,9 @@ fn solve(start: &State, map: &Map, goal: Position) -> Option<(State, u16)> {
             }
         }
 
-        for b in bliz {
-            if b.x == u8::MAX {
-                break;
-            }
-
-            if options.len() == 0 {
-                break;
-            }
-
-            if let Some(found) = options.iter().position(|o| o.pos == b) {
-                options.remove(found);
-            }
-        }
-
         for o in options {
-            cache.insert(o, cost + 1);
-            queue.push_back((o, cost + 1));
+            cache.insert(o, turn + 1);
+            queue.push_back((o, turn + 1));
         }
     }
 
@@ -133,14 +123,8 @@ fn draw(map: &Map, state: &State) {
         for x in 1..map.width - 1 {
             if state.pos.x == x && state.pos.y == y {
                 print!("E");
-            } else if let Some(i) = state.bliz.iter().position(|c| c == &Position::new(x, y)) {
-                match map.bliz[i] {
-                    Dir::N => print!("^"),
-                    Dir::S => print!("v"),
-                    Dir::E => print!(">"),
-                    Dir::W => print!("<"),
-                    Dir::None => panic!("wtf"),
-                }
+            } else if let Some(_) = map.bliz[state.cycle as usize].get(&Position::new(x, y)) {
+                print!("X");
             } else {
                 print!(".");
             }
@@ -161,19 +145,19 @@ fn draw(map: &Map, state: &State) {
         print!("#");
     }
     println!();
+    println!()
 }
 
-fn move_bliz(blizzards: &[Position; SIZE], map: &Map) -> [Position; SIZE] {
-    let mut result = [Position::new(u8::MAX, u8::MAX); SIZE];
+fn move_bliz(bliz: &Vec<Position>, directions: &Vec<Dir>, width: u8, height: u8) -> Vec<Position> {
+    let mut result = Vec::new();
 
-    for i in 0..SIZE {
-        result[i] = match map.bliz[i] {
-            Dir::N => blizzards[i].wrapping_push(0, -1, map.width, map.height),
-            Dir::S => blizzards[i].wrapping_push(0, 1, map.width, map.height),
-            Dir::E => blizzards[i].wrapping_push(1, 0, map.width, map.height),
-            Dir::W => blizzards[i].wrapping_push(-1, 0, map.width, map.height),
-            Dir::None => break,
-        }
+    for i in 0..bliz.len() {
+        result.push(match directions[i] {
+            Dir::N => bliz[i].wrapping_push(0, -1, width, height),
+            Dir::S => bliz[i].wrapping_push(0, 1, width, height),
+            Dir::E => bliz[i].wrapping_push(1, 0, width, height),
+            Dir::W => bliz[i].wrapping_push(-1, 0, width, height),
+        });
     }
 
     result
@@ -182,15 +166,13 @@ fn move_bliz(blizzards: &[Position; SIZE], map: &Map) -> [Position; SIZE] {
 #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct State {
     pos: Position,
-    bliz: [Position; SIZE],
+    cycle: u16,
 }
 
-const SIZE: usize = 3000;
-
-#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Debug)]
 struct Map {
-    bliz: [Dir; SIZE],
-    init: [Position; SIZE],
+    bliz: Vec<HashSet<Position>>,
+    cycle_length: u16,
     height: u8,
     width: u8,
     start: u8,
@@ -256,13 +238,11 @@ enum Dir {
     S,
     E,
     W,
-    None,
 }
 
 fn parse(file: &str) -> Map {
-    let mut bliz = [Dir::None; SIZE];
-    let mut init = [Position::new(u8::MAX, u8::MAX); SIZE];
-    let mut i = 0;
+    let mut directions: Vec<Dir> = Vec::new();
+    let mut init: Vec<Position> = Vec::new();
     let mut start: u8 = 0;
     let mut goal: u8 = 0;
 
@@ -283,45 +263,65 @@ fn parse(file: &str) -> Map {
             }
 
             if c == 'v' {
-                bliz[i] = Dir::S;
-                init[i].x = x as u8;
-                init[i].y = y as u8;
-
-                i += 1;
+                directions.push(Dir::S);
+                init.push(Position::new(x as u8, y as u8));
             }
 
             if c == '>' {
-                bliz[i] = Dir::E;
-                init[i].x = x as u8;
-                init[i].y = y as u8;
-
-                i += 1;
+                directions.push(Dir::E);
+                init.push(Position::new(x as u8, y as u8));
             }
 
             if c == '<' {
-                bliz[i] = Dir::W;
-                init[i].x = x as u8;
-                init[i].y = y as u8;
-
-                i += 1;
+                directions.push(Dir::W);
+                init.push(Position::new(x as u8, y as u8));
             }
 
             if c == '^' {
-                bliz[i] = Dir::N;
-                init[i].x = x as u8;
-                init[i].y = y as u8;
-
-                i += 1;
+                directions.push(Dir::N);
+                init.push(Position::new(x as u8, y as u8));
             }
         }
     }
 
+    let cycle_length = lcd(height as u16 - 2, width as u16 - 2);
+    let mut bliz: Vec<HashSet<Position>> = Vec::new();
+
+    let mut c = init;
+    bliz.push(HashSet::from_iter(c.iter().cloned()));
+    for _ in 1..cycle_length {
+        c = move_bliz(&c, &directions, width, height);
+        bliz.push(HashSet::from_iter(c.iter().cloned()));
+    }
+
     Map {
         bliz,
-        init,
+        cycle_length,
         height,
         width,
         start,
         goal,
+    }
+}
+
+fn lcd(a: u16, b: u16) -> u16 {
+    (a * b) / gcd(a, b)
+}
+
+fn gcd(a: u16, b: u16) -> u16 {
+    let mut a = a;
+    let mut b = b;
+    if a > b {
+        let c = b;
+        b = a;
+        a = c;
+    }
+    loop {
+        let r = b % a;
+        if r == 0 {
+            return a;
+        }
+        b = a;
+        a = r;
     }
 }
