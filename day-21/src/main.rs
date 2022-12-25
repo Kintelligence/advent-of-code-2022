@@ -3,6 +3,25 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+fn main() {
+    let start = std::time::SystemTime::now();
+
+    let mut data = parse("input.txt");
+    println!("Parse: {:?}", start.elapsed());
+
+    let time_1 = std::time::SystemTime::now();
+    part_1(&data);
+
+    println!("Part 1: {:?}", time_1.elapsed());
+
+    let time_2 = std::time::SystemTime::now();
+    part_2(&mut data);
+
+    println!("Part 2: {:?}", time_2.elapsed());
+
+    println!("Total: {:?}", start.elapsed());
+}
+
 fn parse(file: &str) -> HashMap<u64, Monkey> {
     std::fs::read_to_string(shared::io::expand_file_name(file))
         .unwrap()

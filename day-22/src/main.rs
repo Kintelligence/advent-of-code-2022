@@ -7,7 +7,7 @@ fn main() {
     println!("Parse: {:?}", start.elapsed());
 
     let time_1 = std::time::SystemTime::now();
-    //_part_1(&data);
+    _part_1(&data);
 
     println!("Part 1: {:?}", time_1.elapsed());
 
