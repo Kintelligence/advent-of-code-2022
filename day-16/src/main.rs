@@ -185,7 +185,7 @@ fn part_2(map: &mut HashMap<Id, Valve>) {
 
     let len = nodes.len();
 
-    let permutations: Vec<Vec<&Id>> = ((len * 4 / 9)..(len / 2))
+    let permutations: Vec<Vec<&Id>> = ((len * 4 / 9)..=(len / 2))
         .map(|count| itertools::Itertools::combinations(nodes.clone().into_iter(), count))
         .flatten()
         .collect();

@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{BinaryHeap, HashMap, HashSet, VecDeque},
+    collections::{BinaryHeap, HashMap, HashSet},
 };
 
 fn main() {

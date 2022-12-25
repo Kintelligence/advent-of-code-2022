@@ -34,9 +34,9 @@ fn parse(file: &str) -> HashMap<u64, Monkey> {
             match segments.len() {
                 4 => {
                     assert_eq!(segments[1].len(), 4);
-                    assert_eq!(segments[1].parse::<i64>().is_err(), true);
+                    assert_eq!(segments[1].parse::<i128>().is_err(), true);
                     assert_eq!(segments[3].len(), 4);
-                    assert_eq!(segments[3].parse::<i64>().is_err(), true);
+                    assert_eq!(segments[3].parse::<i128>().is_err(), true);
 
                     let left_key = hash(&segments[1]);
                     let right_key = hash(&segments[3]);
@@ -65,7 +65,7 @@ fn hash(input: &str) -> u64 {
 }
 
 enum Monkey {
-    Num(i64),
+    Num(i128),
     Add(u64, u64),
     Sub(u64, u64),
     Mul(u64, u64),
@@ -82,7 +82,7 @@ fn keys(key: u64, map: &HashMap<u64, Monkey>) -> (u64, u64) {
     }
 }
 
-fn value(key: u64, map: &HashMap<u64, Monkey>, cache: &mut HashMap<u64, i64>) -> i64 {
+fn value(key: u64, map: &HashMap<u64, Monkey>, cache: &mut HashMap<u64, i128>) -> i128 {
     if let Some(v) = cache.get(&key) {
         return *v;
     }
@@ -109,7 +109,7 @@ fn value(key: u64, map: &HashMap<u64, Monkey>, cache: &mut HashMap<u64, i64>) ->
 }
 
 fn part_1(map: &HashMap<u64, Monkey>) {
-    let mut cache: HashMap<u64, i64> = HashMap::new();
+    let mut cache: HashMap<u64, i128> = HashMap::new();
     let result = value(hash("root"), map, &mut cache);
 
     println!("{}", result);
@@ -120,28 +120,29 @@ fn part_2(map: &mut HashMap<u64, Monkey>) {
     let (left, right) = keys(hash("root"), map);
     let you = hash("humn");
 
-    for i in 3379022100000..i64::MAX {
-        if i % 10000 == 0 {
-            println!("testing: {} -> ", i);
-        }
+    let mut min: i64 = i64::MIN;
+    let mut max: i64 = i64::MAX;
 
-        map.insert(you, Monkey::Num(i.into()));
-        let mut cache: HashMap<u64, i64> = HashMap::new();
+    loop {
+        let guess = min.saturating_add(max) / 2;
+
+        println!("testing: {} -> ", guess);
+
+        map.insert(you, Monkey::Num(guess.into()));
+        let mut cache: HashMap<u64, i128> = HashMap::new();
         let l = value(left, map, &mut cache);
         let r = value(right, map, &mut cache);
 
-        if i % 10000 == 0 {
-            println!("l: {:>20}", l);
-            println!("r: {:>20}", r);
-            println!("{:?}", l.cmp(&r));
-        }
+        println!("left: {}", l);
+        println!("right: {}", r);
 
-        if l == r {
-            println!("testing: {} -> ", i);
-            println!("left: {}", l);
-            println!("right: {}", r);
-            println!("MATCH");
-            break;
+        match l.cmp(&r) {
+            std::cmp::Ordering::Less => max = guess,
+            std::cmp::Ordering::Equal => {
+                println!("MATCH");
+                break;
+            }
+            std::cmp::Ordering::Greater => min = guess,
         }
     }
 }
