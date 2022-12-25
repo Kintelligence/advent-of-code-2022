@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap, HashSet, VecDeque},
+};
 
 fn main() {
     let start = std::time::SystemTime::now();
@@ -58,14 +61,18 @@ fn part_2(map: &Map) {
     println!("Total: {}", total);
 }
 
+fn heuristic(a: Position, b: Position) -> u16 {
+    a.x.abs_diff(b.x) as u16 + a.y.abs_diff(b.y) as u16
+}
+
 fn solve(start: &State, map: &Map, goal: Position) -> Option<(State, u16)> {
     let mut cache: HashMap<State, u16> = HashMap::new();
-    let mut queue: VecDeque<(State, u16)> = VecDeque::new();
+    let mut queue: BinaryHeap<Reverse<(u16, State, u16)>> = BinaryHeap::new();
 
-    queue.push_back((*start, 0));
+    queue.push(Reverse((heuristic(start.pos, goal), *start, 0)));
     cache.insert(*start, 0);
 
-    while let Some((state, turn)) = queue.pop_front() {
+    while let Some(Reverse((_, state, turn))) = queue.pop() {
         if PRINT {
             draw(map, &state);
         }
@@ -98,7 +105,7 @@ fn solve(start: &State, map: &Map, goal: Position) -> Option<(State, u16)> {
 
         for o in options {
             cache.insert(o, turn + 1);
-            queue.push_back((o, turn + 1));
+            queue.push(Reverse((heuristic(o.pos, goal) + turn + 1, o, turn + 1)));
         }
     }
 
